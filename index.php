@@ -45,13 +45,15 @@
 
 
 
+
+
   // 一覧用の投稿全県取得
   // テーブル結合
   //  INNER JOIN と OUTER JOIN(left join と right join)
   // INNER JOIN = 両方のテーブルに存在するデータのみ取得
   // OUTER JOIN(left join と right join) = 複数のテーブルがあり、それらを結合するときに優先テーブルをひとつきめ、そこにある情報はすべて表示しながら、他のテーブルの情報についになるデータがあれば表示する。
   // 優先テーブルに指定されるとそのテーブルの情報はすべて表示される。
-  $tweet_sql = 'SELECT * FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` ORDER BY `tweets`.`created` DESC';
+  $tweet_sql = 'SELECT * FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` WHERE `delete_flag` = 0 ORDER BY `tweets`.`created` DESC';
   $tweet_stmt = $dbh->prepare($tweet_sql);
   $tweet_stmt->execute();
 
@@ -66,7 +68,7 @@
   }
   var_dump($tweet_list);
 
-  $created_sql = 'SELECT `tweets`.`created` FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` ORDER BY `tweets`.`created` DESC';
+  $created_sql = 'SELECT `tweets`.`created` FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` ORDER BY `tweets`.`modified` DESC';
   $created_stmt = $dbh->prepare($created_sql);
   $created_stmt->execute();
   $created_time = $created_stmt->fetch(PDO::FETCH_ASSOC);
@@ -149,10 +151,10 @@
           </p>
           <p class="day">
             <a href="view.html">
-              <?php echo $created_time['created']; ?>
+              <?php echo date('y-m-d h:i', strtotime($tweet['modified'])); ?>
             </a>
-            [<a href="#" style="color: #00994C;">編集</a>]
-            [<a href="#" style="color: #F33;">削除</a>]
+            [<a href="edit.php?id=<?php echo $tweet['tweet_id'] ?>" style="color: #00994C;">編集</a>]
+            [<a href="delete.php?action=delete&id=<?php echo $tweet['tweet_id']; ?>" style="color: #F33;">削除</a>]
           </p>
         </div>
         <?php endforeach; ?>
