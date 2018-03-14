@@ -43,17 +43,50 @@
     }
   }
 
+  // ページング機能
+  // 空の変数を用意
+  $page = '';
+
+  // パラメータが存在していた場合ページ番号を代入
+  if (isset($_GET['page'])) {
+    $page = $_GET['page'];
+  }else{
+    $page = 1;
+  }
+
+  // 1以外のイレギュラーな数字が入ってきた時、ページ番号を強制的に１とする
+  // max　カンマ区切りで羅列された数字の中から最大の数字を取得する
+  $page = max($page, 1);
+
+  // 1ページ分の表示件数を指定
+  $page_number = 5;
+
+  // データの件数から最大ページを計算する
+  $page_sql = 'SELECT COUNT(*) AS `page_count` FROM `tweets` WHERE `delete_flag` = 0';
+  $page_stmt = $dbh->prepare($page_sql);
+  $page_stmt->execute();
+
+  $page_count = $page_stmt->fetch(PDO::FETCH_ASSOC);
+
+  $all_page_number = ceil($page_count['page_count'] / $page_number);
+  // パラメータのページ番号が最大ページを超えていれば、強制的に最後のページとする
+  $page = min($page, $all_page_number);
+
+  // 表示するデータの取得開始場所
+  $start = ($page - 1) * $page_number;
 
 
 
 
-  // 一覧用の投稿全県取得
+
+
+  // 一覧用の投稿全件取得
   // テーブル結合
   //  INNER JOIN と OUTER JOIN(left join と right join)
   // INNER JOIN = 両方のテーブルに存在するデータのみ取得
   // OUTER JOIN(left join と right join) = 複数のテーブルがあり、それらを結合するときに優先テーブルをひとつきめ、そこにある情報はすべて表示しながら、他のテーブルの情報についになるデータがあれば表示する。
   // 優先テーブルに指定されるとそのテーブルの情報はすべて表示される。
-  $tweet_sql = 'SELECT * FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` WHERE `delete_flag` = 0 ORDER BY `tweets`.`created` DESC';
+  $tweet_sql = "SELECT `tweets`.*, `members`.`nick_name`, `members`.`picture_path` FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` WHERE `delete_flag` = 0 ORDER BY `tweets`.`modified` DESC LIMIT ".$start.",".$page_number;
   $tweet_stmt = $dbh->prepare($tweet_sql);
   $tweet_stmt->execute();
 
@@ -66,12 +99,13 @@
     }
     $tweet_list[] = $tweet;
   }
-  var_dump($tweet_list);
+  // var_dump($tweet_list);
 
-  $created_sql = 'SELECT `tweets`.`created` FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` ORDER BY `tweets`.`modified` DESC';
-  $created_stmt = $dbh->prepare($created_sql);
-  $created_stmt->execute();
-  $created_time = $created_stmt->fetch(PDO::FETCH_ASSOC);
+
+  // $modified_sql = 'SELECT `tweets`.`modified` FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` ORDER BY `tweets`.`modified` DESC';
+  // $modified_stmt = $dbh->prepare($modified_sql);
+  // $modified_stmt->execute();
+  // $modified = $modified_stmt->fetch(PDO::FETCH_ASSOC);
 
  ?>
 
@@ -134,9 +168,18 @@
           <ul class="paging">
             <input type="submit" class="btn btn-info" value="つぶやく">
                 &nbsp;&nbsp;&nbsp;&nbsp;
-                <li><a href="index.html" class="btn btn-default">前</a></li>
+                <?php if ($page == 1): ?>
+                  <li>前</li>
+                <?php else: ?>
+                  <li><a href="index.php?page=<?php echo $page -1; ?>" class="btn btn-default">前</a></li>
+                <?php endif ?>
                 &nbsp;&nbsp;|&nbsp;&nbsp;
-                <li><a href="index.html" class="btn btn-default">次</a></li>
+                <?php if ($page == $all_page_number): ?>
+                  <li>次</li>
+                <?php else: ?>
+                  <li><a href="index.php?page=<?php echo $page +1; ?>" class="btn btn-default">次</a></li>
+                <?php endif ?>
+                <li><?php echo $page; ?>/<?php echo $all_page_number; ?></li>
           </ul>
         </form>
       </div>
@@ -147,14 +190,18 @@
           <img src="picture_path/<?php echo $tweet['picture_path'] ?>" width="48" height="48">
           <p>
             <?php echo $tweet['tweet']; ?><span class="name"> (<?php echo $tweet['nick_name']; ?>) </span>
+            <?php if ($tweet['member_id'] != $login_user['member_id']): ?>
             [<a href="#">Re</a>]
+            <?php endif ?>
           </p>
           <p class="day">
-            <a href="view.html">
+            <a href="view.php?tweet_id=<?php echo $tweet['tweet_id'] ?>">
               <?php echo date('y-m-d h:i', strtotime($tweet['modified'])); ?>
             </a>
+            <?php if ($tweet['member_id'] == $login_user['member_id']): ?>
             [<a href="edit.php?id=<?php echo $tweet['tweet_id'] ?>" style="color: #00994C;">編集</a>]
-            [<a href="delete.php?action=delete&id=<?php echo $tweet['tweet_id']; ?>" style="color: #F33;">削除</a>]
+            [<a href="delete.php?action=delete&tweet_id=<?php echo $tweet['tweet_id']; ?>" style="color: #F33;">削除</a>]
+            <?php endif ?>
           </p>
         </div>
         <?php endforeach; ?>
