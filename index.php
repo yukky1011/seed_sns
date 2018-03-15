@@ -29,19 +29,44 @@
   }
 
   // 呟くボタンが押された時
-  if (!empty($_POST)) {
-    // 入力チェック
-    if ($_POST['tweet'] == '') {
-      $error['tweet'] = 'blank';
-    }
+    //POSTされたhidden要素のトークンを取得
+  $post_token = isset($_POST['token']) ? $_POST['token'] : '';
 
-    if (!isset($error)) {
-      $sql = 'INSERT INTO `tweets` SET `tweet` = ?, `member_id` = ?, `reply_tweet_id` = -1, `created` = NOW(), `modified` = NOW()';
-      $data = array($_POST['tweet'], $_SESSION['id']);
-      $stmt = $dbh->prepare($sql);
-      $stmt->execute($data);
+  //セッションに格納されたトークンを取得
+  $session_token = isset($_SESSION['token']) ? $_SESSION['token'] : '';
+
+  //セッションに格納されたトークンを破棄
+  unset($_SESSION['token']);
+
+  //POSTされたhidden要素のトークンとセッションに格納されているトークンを比較
+  if($post_token != '' && $session_token == $post_token){
+    //トークン一致
+    //（ここで登録処理）
+    if (!empty($_POST)) {
+    // 入力チェック
+      if ($_POST['tweet'] == '') {
+        $error['tweet'] = 'blank';
+      }
+
+      if (!isset($error)) {
+        $sql = 'INSERT INTO `tweets` SET `tweet` = ?, `member_id` = ?, `reply_tweet_id` = -1, `created` = NOW(), `modified` = NOW()';
+        $data = array($_POST['tweet'], $_SESSION['id']);
+        $stmt = $dbh->prepare($sql);
+        $stmt->execute($data);
     }
   }
+  }else{
+    //トークン無し or トークン不一致
+    //（処理キャンセル）
+    $error['token'] = 'false';
+  }
+
+  //二重送信対策用トークンを発行
+  $token = rtrim(base64_encode(openssl_random_pseudo_bytes(32)),'=');
+
+  //トークンをセッションに格納
+  $_SESSION['token'] = $token;
+
 
   // ページング機能
   // 空の変数を用意
@@ -86,7 +111,7 @@
   // INNER JOIN = 両方のテーブルに存在するデータのみ取得
   // OUTER JOIN(left join と right join) = 複数のテーブルがあり、それらを結合するときに優先テーブルをひとつきめ、そこにある情報はすべて表示しながら、他のテーブルの情報についになるデータがあれば表示する。
   // 優先テーブルに指定されるとそのテーブルの情報はすべて表示される。
-  $tweet_sql = "SELECT `tweets`.*, `members`.`nick_name`, `members`.`picture_path` FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` WHERE `delete_flag` = 0 ORDER BY `tweets`.`modified` DESC LIMIT ".$start.",".$page_number;
+  $tweet_sql = "SELECT `tweets`.*, `members`.`nick_name`, `members`.`picture_path` FROM `tweets` LEFT JOIN `members` ON `tweets`.`member_id` = `members`.`member_id` WHERE `delete_flag` = 0 ORDER BY `tweets`.`modified` DESC LIMIT $start, $page_number";
   $tweet_stmt = $dbh->prepare($tweet_sql);
   $tweet_stmt->execute();
 
@@ -165,6 +190,7 @@
                 <?php endif ?>
               </div>
             </div>
+            <input type="hidden" name="token" value="<?php echo $token;?>">
           <ul class="paging">
             <input type="submit" class="btn btn-info" value="つぶやく">
                 &nbsp;&nbsp;&nbsp;&nbsp;
@@ -191,7 +217,7 @@
           <p>
             <?php echo $tweet['tweet']; ?><span class="name"> (<?php echo $tweet['nick_name']; ?>) </span>
             <?php if ($tweet['member_id'] != $login_user['member_id']): ?>
-            [<a href="#">Re</a>]
+            [<a href="reply.php?tweet_id=<?php echo $tweet['tweet_id']; ?>">Re</a>]
             <?php endif ?>
           </p>
           <p class="day">
@@ -199,8 +225,11 @@
               <?php echo date('y-m-d h:i', strtotime($tweet['modified'])); ?>
             </a>
             <?php if ($tweet['member_id'] == $login_user['member_id']): ?>
-            [<a href="edit.php?id=<?php echo $tweet['tweet_id'] ?>" style="color: #00994C;">編集</a>]
-            [<a href="delete.php?action=delete&tweet_id=<?php echo $tweet['tweet_id']; ?>" style="color: #F33;">削除</a>]
+              [<a href="edit.php?id=<?php echo $tweet['tweet_id'] ?>" style="color: #00994C;">編集</a>]
+              [<a href="delete.php?action=delete&tweet_id=<?php echo $tweet['tweet_id']; ?>" style="color: #F33;">削除</a>]
+            <?php endif ?>
+            <?php if ($tweet['reply_tweet_id'] != -1): ?>
+              [<a href="view.php?tweet_id=<?php echo $tweet['reply_tweet_id']; ?>" style="color: #a9a9a9;">返信もと</a>]
             <?php endif ?>
           </p>
         </div>
